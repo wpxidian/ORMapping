@@ -11,17 +11,16 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
+import org.apache.log4j.Logger;
+
+import cn.edu.xidian.cache.Cache;
+import cn.edu.xidian.cache.CacheFactory;
+
 /**
- * 
- * 类名称：ORMapping   
- * 类描述：OR映射类，该类是一个泛型类，通过该类实现对数据对象的增删查改   
- * 创建人：WangPeng  
- * 创建时间：2014-5-11 下午5:33:03   
- * 修改人：WangPeng   
- * 修改时间：2014-5-11 下午5:33:03   
- * 修改备注：   
+ * OR映射类，该类是一个泛型类，通过该类实现对数据对象的增删查改 
+ * @author WangPeng 
  * @version 1.0   
- *
+ * @since JDK 1.7
  */
 public class ORMapping {
 	
@@ -33,13 +32,41 @@ public class ORMapping {
 	
 	private Field[] fields ;
 	
+	private static Cache cache = CacheFactory.getInstance() ;
+	
+	private static volatile long sqlCount = 0L ;
+	
+	private static volatile long correctSqlCount = 0L;
+	
+	private static volatile long updateCount = 0L;
+	
+	public static long getSqlCount() {
+		return sqlCount;
+	}
+	
+	public static long getCorrectSqlCount() {
+		return correctSqlCount;
+	}
+	
+	public static double getCorrectRate()
+	{
+		return ((double)correctSqlCount)/sqlCount;
+	}
+	
+	public static double getUpdate_query()
+	{
+		return ((double)updateCount)/sqlCount;
+	}
+	
 	public <T> void init(Class<T> objectClass) throws InstantiationException, IllegalAccessException{
 		
 		this.objectClass = objectClass ;
-		this.object = objectClass.newInstance() ;
-		this.tableName = objectClass.getSimpleName().toLowerCase() ;
-		this.fields = objectClass.getDeclaredFields() ;
 		
+		this.object = objectClass.newInstance() ;
+		
+		this.tableName = objectClass.getSimpleName().toLowerCase() ;
+		
+		this.fields = objectClass.getDeclaredFields() ;
 	}
 	/**
 	 * 根据ID属性查询
@@ -48,9 +75,18 @@ public class ORMapping {
 	 */
 	@SuppressWarnings("unchecked")
 	public <T> T get(Class<T> objectClass, int id){
-
+		Logger log = Logger.getLogger(ORMapping.class) ;
+		
+		sqlCount++;
+		
+		boolean isCorrect = false ;
+		
+		long startTime = System.currentTimeMillis() ;
+		
 		Connection conn = null ;
+		
 		PreparedStatement pstmt = null ;
+		
 		ResultSet rs = null ;
 		
 		try{
@@ -58,23 +94,38 @@ public class ORMapping {
 			init(objectClass) ;
 			
 			conn = SimpleDataSource.getInstance().getConection() ;
+			
 			pstmt = conn.prepareStatement("SELECT * FROM " + tableName + " WHERE id=?") ;
+			
 			pstmt.setInt(1, id) ;
+			
+			Object value = cache.get(tableName, getSQL(pstmt)) ;
+			
+			if(value != null){
+				correctSqlCount++ ;
+				isCorrect = true;
+				return (T)value ;
+			}
+			
 			rs = pstmt.executeQuery() ;
-			try{
-				while(rs.next()){
-					getValuesFromResultSet(rs) ;
-				}
+			
+			while(rs.next()){
+				
+				getValuesFromResultSet(rs) ;
 			}
-			catch (Exception e) {
-				e.printStackTrace();
-			}finally{
-				SimpleDataSource.getInstance().free(conn, pstmt, rs) ;
-			}
+			
+			cache.put(tableName, getSQL(pstmt), object) ;
+			log.info("cache info:\n\tcorrectRate:"+ORMapping.getCorrectRate()+"\n\tupdate/query:"+
+					ORMapping.getUpdate_query()+"\n\tsqlCount:"+ORMapping.getSqlCount()+"\tcorrectSQLCount:"+
+					ORMapping.getCorrectSqlCount()+"\tupdateCount:"+ORMapping.getUpdate_query());
+			
 			return  (T) object ;
 		}catch(Exception e){
 			e.printStackTrace() ;
 			return null ;
+		}finally{
+			log.info("ORMappingInfo[SQL:"+getSQL(pstmt)+",IsCorrect:"+isCorrect+",Timespan:"+(System.currentTimeMillis()-startTime)+"ms]");
+			SimpleDataSource.getInstance().free(conn, pstmt, rs) ;
 		}
 	}
 	
@@ -85,11 +136,16 @@ public class ORMapping {
 	 * @return void
 	 */
 	public <T> void save(T object) {
+		Logger log = Logger.getLogger(ORMapping.class) ;
+		
+		long startTime = System.currentTimeMillis() ;
 		
 		Connection conn = null ;
+		
 		PreparedStatement pstmt = null ;
 		
 		StringBuilder key = new StringBuilder() ;
+		
 		StringBuilder value = new StringBuilder() ;
 		/**
 		 * 保存需要操作的属性
@@ -99,20 +155,26 @@ public class ORMapping {
 		try{
 			
 			init(object.getClass()) ;
+			
 			this.object = object ;
 			
 			fullKeyValue(fieldList, key, value) ;
 				
 			String sql = "INSERT INTO " + tableName + "(" + key + ") VALUES" + "(" + value + ")" ;
+			
 			conn = SimpleDataSource.getInstance().getConection() ;
+			
 			pstmt = conn.prepareStatement(sql) ;
 			
 			fullPrepareStatement(pstmt,fieldList) ;
 			
-			if(pstmt.executeUpdate()>0){
-				System.out.println("insert success");
-			}
+			pstmt.executeUpdate() ;
 			
+			updateCount++ ;
+			
+			cache.removeAll(tableName) ;
+			
+			log.info("ORMappingInfo[SQL:"+getSQL(pstmt)+",Timespan:"+(System.currentTimeMillis()-startTime)+"ms]");
 		}catch(Exception e){
 			e.printStackTrace() ;
 		}finally{
@@ -125,8 +187,12 @@ public class ORMapping {
 	 * @return void
 	 */
 	public <T> void update(T object){
+		Logger log = Logger.getLogger(ORMapping.class) ;
+		
+		long startTime = System.currentTimeMillis() ;
 		
 		Connection conn = null ;
+		
 		PreparedStatement pstmt = null ;
 		
 		/**
@@ -136,6 +202,7 @@ public class ORMapping {
 		try{
 			
 			init(object.getClass()) ;
+			
 			this.object = object ;
 			
 			StringBuilder setStatement = new StringBuilder() ;
@@ -158,15 +225,24 @@ public class ORMapping {
 			}
 			
 			String sql = "UPDATE " + tableName + " SET " + setStatement + " WHERE id=?" ;
+			
 			conn = SimpleDataSource.getInstance().getConection() ;
+			
 			pstmt = conn.prepareStatement(sql) ;
+			
 			fullPrepareStatement(pstmt, fieldList) ;
 			
 			Method method = objectClass.getMethod("getId") ;
+			
 			pstmt.setInt(fieldList.size()+1, (Integer) method.invoke(object)) ;
 			
 			pstmt.executeUpdate() ;
 			
+			updateCount++ ;
+			
+			cache.removeAll(tableName) ;
+			
+			log.info("ORMappingInfo[SQL:"+getSQL(pstmt)+",Timespan:"+(System.currentTimeMillis()-startTime)+"ms]");
 		}catch(Exception e){
 			e.printStackTrace() ;
 		}finally{
@@ -180,13 +256,18 @@ public class ORMapping {
 	 * @return void
 	 */
 	public <T> void delelte(T object){
+		Logger log = Logger.getLogger(ORMapping.class) ;
+		
+		long startTime = System.currentTimeMillis() ;
 		
 		Connection conn = null ;
+		
 		PreparedStatement pstmt = null ;
 		
 		try{
 			
 			init(object.getClass()) ;
+			
 			this.object = object ;
 			
 			String sql = "DELETE FROM " + tableName + " WHERE id=?" ;
@@ -200,6 +281,11 @@ public class ORMapping {
 			
 			pstmt.execute() ;
 			
+			updateCount++ ;
+			
+			cache.removeAll(tableName) ;
+			
+			log.info("ORMappingInfo[SQL:"+getSQL(pstmt)+",Timespan:"+(System.currentTimeMillis()-startTime)+"ms]");
 		}catch(Exception e){
 			e.printStackTrace() ;
 		}finally{
@@ -210,6 +296,16 @@ public class ORMapping {
 	
 	
 	/** #########################################################以下是一些辅助方案############################################################ */
+	
+	/**
+	 * @return String
+	 * @throws
+	 */
+	private String getSQL(PreparedStatement pstmt) {
+		String[] strs = pstmt.toString().split(":") ;
+		return strs[1];
+	}
+	
 	/**
 	 * 为PreparedStatement填充所需要的参数
 	 * @param pstmt
