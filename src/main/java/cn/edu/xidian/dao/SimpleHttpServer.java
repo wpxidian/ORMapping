@@ -13,6 +13,7 @@ import java.net.URLDecoder;
 import java.util.StringTokenizer;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+<<<<<<< HEAD
 /**
  * 用Java语言实现HTTP服务器,首先启动一个java.net.ServerSocket在提供服务的端口上监听连接.向客户返回文本时,
  * 可以用PrintWriter,但是如果返回二进制数据,则必须使用OutputStream.write(byte[])方法,返回的应答消息字符串可以使
@@ -20,6 +21,22 @@ import java.util.concurrent.Executors;
  * @author WangPeng 
  * @version 1.0   
  * @since JDK 1.7
+=======
+
+/**
+ * 
+ * 类名称：SimpleHttpServer   
+ * 类描述：用Java语言实现HTTP服务器,首先启动一个java.net.ServerSocket在提供服务的端口上监听连接.向客户返回文本时,
+ * 可以用PrintWriter,但是如果返回二进制数据,则必须使用OutputStream.write(byte[])方法,返回的应答消息字符串可以使
+ * 用String.getBytes()方法转换为字节数组返回,或者使用PrintStream的print()方法写入文本,用write(byte[])方法写入二进制数据.  
+ * 创建人：WangPeng  
+ * 创建时间：2014-5-12 下午2:41:07   
+ * 修改人：WangPeng   
+ * 修改时间：2014-5-12 下午2:41:07   
+ * 修改备注：   
+ * @version 1.0   
+ *
+>>>>>>> 53089e316f00bf934408d86a9098454d9c24e223
  */
 public class SimpleHttpServer {
 	

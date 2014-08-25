@@ -10,11 +10,26 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 
 import org.apache.log4j.Logger;
+<<<<<<< HEAD
 /**
  * 这是数据源(DataSource)的一个简单实现，该数据源是线程安全的单例模式。
  * @author WangPeng 
  * @version 1.0   
  * @since JDK 1.7
+=======
+
+/**
+ * 
+ * 类名称：SimpleDataSource   
+ * 类描述：这是数据源(DataSource)的一个简单实现，该数据源是线程安全的单例模式。
+ * 创建人：WangPeng  
+ * 创建时间：2014-5-11 下午3:20:09   
+ * 修改人：WangPeng   
+ * 修改时间：2014-5-11 下午3:20:09   
+ * 修改备注：   
+ * @version 1.0   
+ *
+>>>>>>> 53089e316f00bf934408d86a9098454d9c24e223
  */
 public class SimpleDataSource implements DataSource{
  

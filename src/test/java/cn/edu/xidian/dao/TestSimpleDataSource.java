@@ -3,7 +3,10 @@ package cn.edu.xidian.dao;
 import static org.junit.Assert.*;
 
 import java.sql.Connection;
+<<<<<<< HEAD
 import java.sql.PreparedStatement;
+=======
+>>>>>>> 53089e316f00bf934408d86a9098454d9c24e223
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -81,6 +84,7 @@ public class TestSimpleDataSource {
 		Admin admin = ORM.get(Admin.class, 2) ;
 		ORM.delelte(admin) ;
 	}
+<<<<<<< HEAD
 	@Test
 	public void testIsolationLevel(){
 		Connection conn = SimpleDataSource.getInstance().getConection() ;
@@ -144,4 +148,6 @@ public class TestSimpleDataSource {
 			e.printStackTrace();
 		}
 	}
+=======
+>>>>>>> 53089e316f00bf934408d86a9098454d9c24e223
 }
